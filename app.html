@@ -26,7 +26,7 @@
       position: fixed;
       top: 0; left: 0; right: 0;
       bottom: calc(-1 * var(--footer-offset));
-      height: calc(100% + var(--footer-offset));
+      height: calc(100%);
     }
     iframe { width: 100%; height: 100%; border: 0; display: block; }
     #loader {
@@ -46,7 +46,8 @@
   <script>
     // ↓↓↓ REPLACE with your deployed Apps Script Web App URL ↓↓↓
     
-    const GAS_APP_URL = '__MY_SECRET_URL__';
+    // const GAS_APP_URL = '__MY_SECRET_URL__';
+    const GAS_APP_URL = 'https://script.google.com/macros/s/AKfycbwOI8nAyXAr6DydeZILxhkxUQOXQPhHbCoeST205rw7eenvKvUmAAWRdbhPD4OVsRhR/exec';
 
     function onFrameLoad() {
       const loader = document.getElementById('loader');
