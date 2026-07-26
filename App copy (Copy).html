@@ -12,12 +12,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0f172a">
   
-  <!-- High Quality Icon -->
-  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/512/1086/1086741.png">
-  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/1086/1086741.png">
+  <!-- High Quality Icon (Now points to a local file in your GitHub repo) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+  <link rel="icon" type="image/png" href="icon.png">
   
-  <!-- Inline Manifest for Android PWA Support -->
-  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22MatFinance%22%2C%22short_name%22%3A%22MatFinance%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%230f172a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn-icons-png.flaticon.com%2F512%2F1086%2F1086741.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
+  <!-- Inline Manifest for Android PWA Support (Updated to use local icon.png) -->
+  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22MatFinance%22%2C%22short_name%22%3A%22MatFinance%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%230f172a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22icon.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
 
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; overflow: hidden; }
@@ -45,7 +45,8 @@
 
   <script>
     // ↓↓↓ REPLACE with your deployed Apps Script Web App URL ↓↓↓
-    const GAS_APP_URL = 'https://script.google.com/macros/s/[YOUR_DEPLOYMENT_ID]/exec';
+    
+    const GAS_APP_URL = '__MY_SECRET_URL__';
 
     function onFrameLoad() {
       const loader = document.getElementById('loader');
