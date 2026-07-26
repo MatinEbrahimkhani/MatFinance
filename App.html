@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>MatFinance</title>
+
+  <!-- PWA / "Add to Home Screen" metadata & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MatFinance">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
+  
+  <!-- High Quality Icon -->
+  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/512/1086/1086741.png">
+  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/1086/1086741.png">
+  
+  <!-- Inline Manifest for Android PWA Support -->
+  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22MatFinance%22%2C%22short_name%22%3A%22MatFinance%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%230f172a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn-icons-png.flaticon.com%2F512%2F1086%2F1086741.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
+
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; overflow: hidden; }
+    :root { --footer-offset: 42px; }
+    #wrap {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      bottom: calc(-1 * var(--footer-offset));
+      height: calc(100% + var(--footer-offset));
+    }
+    iframe { width: 100%; height: 100%; border: 0; display: block; }
+    #loader {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #0f172a; color: #64748b; font-family: sans-serif; font-size: 14px;
+      transition: opacity .3s ease;
+    }
+  </style>
+</head>
+<body>
+  <div id="loader">Loading MatFinance...</div>
+  <div id="wrap">
+    <iframe id="gasFrame" title="MatFinance" src=""></iframe>
+  </div>
+
+  <script>
+    // ↓↓↓ REPLACE with your deployed Apps Script Web App URL ↓↓↓
+    const GAS_APP_URL = 'https://script.google.com/macros/s/[YOUR_DEPLOYMENT_ID]/exec';
+
+    function onFrameLoad() {
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 300);
+      }
+    }
+
+    const iframe = document.getElementById('gasFrame');
+    iframe.addEventListener('load', onFrameLoad);
+    iframe.src = GAS_APP_URL;
+
+    setTimeout(() => {
+      const loader = document.getElementById('loader');
+      if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 300); }
+    }, 6000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,688 @@
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MatFinance</title>
+
+<!-- PWA / Home-screen feel -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MatFinance">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f172a">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1086/1086741.png">
+<link rel="icon" href="https://cdn-icons-png.flaticon.com/512/1086/1086741.png">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root { color-scheme: dark; }
+  * { font-family: 'Inter', sans-serif; }
+  body { -webkit-tap-highlight-color: transparent; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+  .fade-in { animation: fadeIn .25s ease-out; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+  .tab-active { color: #34d399; }
+  select, input { color-scheme: dark; }
+</style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-24">
+
+<header class="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-2">
+    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">M</div>
+    <h1 class="text-lg font-bold">MatFinance</h1>
+  </div>
+  <div id="statusPill" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 flex items-center gap-1.5">
+    <span id="statusDot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+    <span id="statusText">Checking...</span>
+  </div>
+</header>
+
+<!-- Toast / error banner -->
+<div id="toastContainer" class="fixed top-16 inset-x-0 z-50 flex flex-col items-center gap-2 px-4 pointer-events-none"></div>
+
+<main class="max-w-md mx-auto px-4 pt-4">
+
+  <section id="tab-add" class="tab-panel">
+    <div class="flex bg-slate-900 rounded-xl p-1 mb-4">
+      <button type="button" onclick="setTxType('Expense')" id="btnTypeExpense"
+        class="flex-1 py-2 rounded-lg text-sm font-semibold transition">Expense</button>
+      <button type="button" onclick="setTxType('Income')" id="btnTypeIncome"
+        class="flex-1 py-2 rounded-lg text-sm font-semibold transition">Income</button>
+    </div>
+
+    <form id="txForm" class="space-y-4 bg-slate-900 rounded-2xl p-4 border border-slate-800">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">Amount</label>
+        <input id="amountInput" inputmode="numeric" placeholder="0"
+          class="w-full bg-slate-800 rounded-xl px-4 py-3 text-xl font-bold text-left focus:outline-none focus:ring-2 focus:ring-emerald-500" required>
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">Category</label>
+        <select id="categorySelect" class="w-full bg-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">Description (Optional)</label>
+        <input id="descInput" placeholder="e.g., Groceries"
+          class="w-full bg-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5">Date</label>
+        <div class="grid grid-cols-3 gap-2">
+          <select id="jYear" class="bg-slate-800 rounded-xl px-2 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+          <select id="jMonth" class="bg-slate-800 rounded-xl px-2 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+          <select id="jDay" class="bg-slate-800 rounded-xl px-2 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+        </div>
+      </div>
+
+      <button type="submit"
+        class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 rounded-xl transition active:scale-[.98]">
+        Add Transaction
+      </button>
+    </form>
+  </section>
+
+  <section id="tab-list" class="tab-panel hidden">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-bold text-slate-200">Transaction History</h2>
+      <span id="pendingBadge" class="hidden text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400"></span>
+    </div>
+    <div id="txList" class="space-y-2"></div>
+    <div id="emptyState" class="hidden text-center text-slate-500 text-sm py-16">
+      No transactions recorded yet.
+    </div>
+  </section>
+
+  <section id="tab-report" class="tab-panel hidden">
+    <div class="mb-4">
+      <label class="block text-xs text-slate-400 mb-1.5">Select Month</label>
+      <select id="reportMonthSelect" class="w-full bg-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+        <div class="text-[11px] text-slate-400 mb-1">Income</div>
+        <div id="reportIncome" class="text-sm font-bold text-emerald-400">0</div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+        <div class="text-[11px] text-slate-400 mb-1">Expense</div>
+        <div id="reportExpense" class="text-sm font-bold text-rose-400">0</div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+        <div class="text-[11px] text-slate-400 mb-1">Net Balance</div>
+        <div id="reportNet" class="text-sm font-bold">0</div>
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+      <canvas id="pieChart" height="260"></canvas>
+      <div id="chartEmpty" class="hidden text-center text-slate-500 text-sm py-10">No data to display for this month.</div>
+    </div>
+  </section>
+</main>
+
+<nav class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur border-t border-slate-800">
+  <div class="max-w-md mx-auto grid grid-cols-3">
+    <button onclick="switchTab('add')" id="navAdd" class="flex flex-col items-center gap-1 py-3 text-slate-500 transition">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="text-[11px] font-medium">Add</span>
+    </button>
+    <button onclick="switchTab('list')" id="navList" class="flex flex-col items-center gap-1 py-3 text-slate-500 transition">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span class="text-[11px] font-medium">List</span>
+    </button>
+    <button onclick="switchTab('report')" id="navReport" class="flex flex-col items-center gap-1 py-3 text-slate-500 transition">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+      <span class="text-[11px] font-medium">Report</span>
+    </button>
+  </div>
+</nav>
+
+<script>
+// ---------------------- Constants ----------------------
+const LS_TX = 'matfinance_transactions';
+const LS_PENDING_ADD = 'matfinance_pending_add';
+const LS_PENDING_DELETE = 'matfinance_pending_delete';
+const LS_CATEGORIES = 'matfinance_categories';
+const LS_LAST_SYNC = 'matfinance_last_sync';
+
+const FALLBACK_CATEGORIES = {
+  income: ['Salary', 'Freelance', 'Investment', 'Gift', 'Other Income'],
+  expense: ['Food', 'Transport', 'Housing', 'Bills', 'Entertainment', 'Health', 'Education', 'Shopping', 'Other Expenses']
+};
+
+let state = {
+  transactions: [],
+  categories: FALLBACK_CATEGORIES,
+  currentType: 'Expense',
+  activeTab: 'add',
+  chart: null,
+  syncing: false
+};
+
+// ---------------------- Utilities ----------------------
+function formatAmount(n) {
+  const num = Math.round(Number(n) || 0);
+  return num.toLocaleString('en-US');
+}
+
+function parseAmountInput(str) {
+  return Number(String(str).replace(/[^0-9]/g, '')) || 0;
+}
+
+// Format input live as user types
+document.getElementById('amountInput').addEventListener('input', function() {
+  let raw = this.value.replace(/[^0-9]/g, '');
+  if (raw === '') {
+    this.value = '';
+    return;
+  }
+  this.value = Number(raw).toLocaleString('en-US');
+});
+
+function uid() {
+  return 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+}
+function saveLS(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+function loadLS(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) { return fallback; }
+}
+
+// ---------------------- Jalali <-> Gregorian ----------------------
+function gregorianToJalali(gy, gm, gd) {
+  const g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+  let jy = (gy <= 1600) ? 0 : 979;
+  gy -= (gy <= 1600) ? 621 : 1600;
+  const gy2 = (gm > 2) ? (gy + 1) : gy;
+  let days = (365 * gy) + parseInt((gy2 + 3) / 4) - parseInt((gy2 + 99) / 100)
+    + parseInt((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
+  jy += 33 * parseInt(days / 12053);
+  days %= 12053;
+  jy += 4 * parseInt(days / 1461);
+  days %= 1461;
+  if (days > 365) {
+    jy += parseInt((days - 1) / 365);
+    days = (days - 1) % 365;
+  }
+  const jm = (days < 186) ? 1 + parseInt(days / 31) : 7 + parseInt((days - 186) / 30);
+  const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+  return { jy: jy, jm: jm, jd: jd };
+}
+function jalaliDaysInMonth(jy, jm) {
+  if (jm <= 6) return 31;
+  if (jm <= 11) return 30;
+  const isLeap = ((((jy - (jy > 0 ? 474 : 473)) % 2820) + 474 + 38) * 682) % 2816 < 682;
+  return isLeap ? 30 : 29;
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+// ---------------------- Init ----------------------
+document.addEventListener('DOMContentLoaded', init);
+
+function init() {
+  state.transactions = loadLS(LS_TX, []);
+  state.categories = loadLS(LS_CATEGORIES, FALLBACK_CATEGORIES);
+
+  buildCategoryOptions();
+  buildDatePickers();
+  setTxType('Expense');
+  renderAll();
+  updateStatusPill('offline-cache');
+
+  document.getElementById('txForm').addEventListener('submit', onSubmitTransaction);
+
+  refreshFromServer();
+  flushPendingQueue();
+
+  window.addEventListener('online', flushPendingQueue);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') flushPendingQueue();
+  });
+  setInterval(flushPendingQueue, 30000);
+}
+
+// ---------------------- Tabs ----------------------
+function switchTab(tab) {
+  state.activeTab = tab;
+  ['add', 'list', 'report'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+    document.getElementById('nav' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('tab-active', t === tab);
+    document.getElementById('nav' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('text-slate-500', t !== tab);
+  });
+  if (tab === 'report') renderReport();
+}
+
+// ---------------------- Add form ----------------------
+function setTxType(type) {
+  state.currentType = type;
+  const expBtn = document.getElementById('btnTypeExpense');
+  const incBtn = document.getElementById('btnTypeIncome');
+  if (type === 'Expense') {
+    expBtn.className = 'flex-1 py-2 rounded-lg text-sm font-semibold transition bg-rose-500/20 text-rose-400';
+    incBtn.className = 'flex-1 py-2 rounded-lg text-sm font-semibold transition text-slate-400';
+  } else {
+    incBtn.className = 'flex-1 py-2 rounded-lg text-sm font-semibold transition bg-emerald-500/20 text-emerald-400';
+    expBtn.className = 'flex-1 py-2 rounded-lg text-sm font-semibold transition text-slate-400';
+  }
+  buildCategoryOptions();
+}
+
+function buildCategoryOptions() {
+  const sel = document.getElementById('categorySelect');
+  const list = state.currentType === 'Income' ? state.categories.income : state.categories.expense;
+  sel.innerHTML = list.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+}
+
+function buildDatePickers() {
+  const today = new Date();
+  const j = gregorianToJalali(today.getFullYear(), today.getMonth() + 1, today.getDate());
+
+  const yearSel = document.getElementById('jYear');
+  const monthSel = document.getElementById('jMonth');
+  const daySel = document.getElementById('jDay');
+
+  const years = [];
+  for (let y = j.jy - 5; y <= j.jy + 1; y++) years.push(y);
+  yearSel.innerHTML = years.map(y => `<option value="${y}" ${y === j.jy ? 'selected' : ''}>${y}</option>`).join('');
+
+  const monthNames = ['Farvardin','Ordibehesht','Khordad','Tir','Mordad','Shahrivar','Mehr','Aban','Azar','Dey','Bahman','Esfand'];
+  monthSel.innerHTML = monthNames.map((m, i) => `<option value="${i+1}" ${i+1===j.jm?'selected':''}>${m}</option>`).join('');
+
+  function rebuildDays() {
+    const jy = Number(yearSel.value), jm = Number(monthSel.value);
+    const dim = jalaliDaysInMonth(jy, jm);
+    const prevDay = Number(daySel.value) || j.jd;
+    const days = [];
+    for (let d = 1; d <= dim; d++) days.push(d);
+    daySel.innerHTML = days.map(d => `<option value="${d}" ${d===Math.min(prevDay, dim)?'selected':''}>${d}</option>`).join('');
+  }
+  rebuildDays();
+  daySel.value = j.jd;
+  yearSel.addEventListener('change', rebuildDays);
+  monthSel.addEventListener('change', rebuildDays);
+}
+
+function getSelectedJalaliDateString() {
+  const jy = document.getElementById('jYear').value;
+  const jm = pad2(document.getElementById('jMonth').value);
+  const jd = pad2(document.getElementById('jDay').value);
+  return `${jy}/${jm}/${jd}`;
+}
+
+function onSubmitTransaction(e) {
+  e.preventDefault();
+  const amount = parseAmountInput(document.getElementById('amountInput').value);
+  const category = document.getElementById('categorySelect').value;
+  const description = document.getElementById('descInput').value.trim();
+  const date = getSelectedJalaliDateString();
+
+  if (!amount || amount <= 0) {
+    showToast('Please enter a valid amount.', 'error');
+    return;
+  }
+  if (!category) {
+    showToast('Please select a category.', 'error');
+    return;
+  }
+
+  const tx = {
+    id: uid(),
+    date: date,
+    type: state.currentType,
+    category: category,
+    description: description,
+    amount: amount,
+    _pending: true
+  };
+
+  state.transactions.unshift(tx);
+  saveLS(LS_TX, state.transactions);
+  renderAll();
+  showToast('Transaction added ✓', 'success');
+
+  document.getElementById('amountInput').value = '';
+  document.getElementById('descInput').value = '';
+  document.getElementById('amountInput').focus();
+
+  const pending = loadLS(LS_PENDING_ADD, []);
+  pending.push(tx);
+  saveLS(LS_PENDING_ADD, pending);
+
+  flushPendingQueue();
+}
+
+// ---------------------- Delete ----------------------
+function requestDelete(id) {
+  if (!confirm('Delete this transaction?')) return;
+
+  state.transactions = state.transactions.filter(t => t.id !== id);
+  saveLS(LS_TX, state.transactions);
+  renderAll();
+
+  let pendingAdd = loadLS(LS_PENDING_ADD, []);
+  const wasUnsynced = pendingAdd.some(t => t.id === id);
+  if (wasUnsynced) {
+    pendingAdd = pendingAdd.filter(t => t.id !== id);
+    saveLS(LS_PENDING_ADD, pendingAdd);
+    showToast('Transaction deleted.', 'success');
+    return;
+  }
+
+  const pendingDel = loadLS(LS_PENDING_DELETE, []);
+  pendingDel.push(id);
+  saveLS(LS_PENDING_DELETE, pendingDel);
+  showToast('Transaction deleted.', 'success');
+  flushPendingQueue();
+}
+
+// ---------------------- Sync engine ----------------------
+function isGasAvailable() {
+  return typeof google !== 'undefined' && google.script && google.script.run;
+}
+
+function refreshFromServer() {
+  if (!isGasAvailable()) { updateStatusPill('offline'); return; }
+  updateStatusPill('syncing');
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (res && res.success) {
+        state.categories = res.data.categories;
+        saveLS(LS_CATEGORIES, state.categories);
+        buildCategoryOptions();
+
+        const pendingIds = new Set(loadLS(LS_PENDING_ADD, []).map(t => t.id));
+        const serverTx = res.data.transactions.map(t => Object.assign({}, t, { _pending: false }));
+        const stillPendingLocal = state.transactions.filter(t => pendingIds.has(t.id));
+        state.transactions = stillPendingLocal.concat(serverTx)
+          .sort((a, b) => (a.date < b.date ? 1 : -1));
+        saveLS(LS_TX, state.transactions);
+        saveLS(LS_LAST_SYNC, Date.now());
+        renderAll();
+        updateStatusPill('online');
+      } else {
+        updateStatusPill('error', res ? res.error : 'Unknown Error');
+      }
+    })
+    .withFailureHandler(function (err) {
+      updateStatusPill('offline');
+      console.warn('refreshFromServer failed:', err);
+    })
+    .getInitialData();
+}
+
+function flushPendingQueue() {
+  if (!isGasAvailable() || state.syncing) return;
+
+  const pendingAdd = loadLS(LS_PENDING_ADD, []);
+  const pendingDel = loadLS(LS_PENDING_DELETE, []);
+  if (pendingAdd.length === 0 && pendingDel.length === 0) {
+    updateStatusPill('online');
+    return;
+  }
+
+  state.syncing = true;
+  updateStatusPill('syncing');
+  updatePendingBadge();
+
+  const addQueue = pendingAdd.slice();
+  const delQueue = pendingDel.slice();
+
+  function processAdd(i) {
+    if (i >= addQueue.length) { processDelete(0); return; }
+    const tx = addQueue[i];
+    google.script.run
+      .withSuccessHandler(function (res) {
+        let remaining = loadLS(LS_PENDING_ADD, []);
+        if (res && res.success) {
+          state.transactions = state.transactions.map(t =>
+            t.id === tx.id ? Object.assign({}, t, { id: res.data.id, _pending: false }) : t
+          );
+          saveLS(LS_TX, state.transactions);
+          remaining = remaining.filter(t => t.id !== tx.id);
+          saveLS(LS_PENDING_ADD, remaining);
+          renderAll();
+        } else {
+          console.warn('addTransaction sync failed, will retry:', res && res.error);
+        }
+        processAdd(i + 1);
+      })
+      .withFailureHandler(function (err) {
+        console.warn('addTransaction network failure, will retry:', err);
+        processAdd(addQueue.length);
+      })
+      .addTransaction(tx);
+  }
+
+  function processDelete(i) {
+    if (i >= delQueue.length) { finishSync(); return; }
+    const id = delQueue[i];
+    google.script.run
+      .withSuccessHandler(function (res) {
+        let remaining = loadLS(LS_PENDING_DELETE, []);
+        remaining = remaining.filter(x => x !== id);
+        saveLS(LS_PENDING_DELETE, remaining);
+        processDelete(i + 1);
+      })
+      .withFailureHandler(function (err) {
+        console.warn('deleteTransaction network failure, will retry:', err);
+        processDelete(delQueue.length);
+      })
+      .deleteTransaction(id);
+  }
+
+  function finishSync() {
+    state.syncing = false;
+    updatePendingBadge();
+    const stillPending = loadLS(LS_PENDING_ADD, []).length + loadLS(LS_PENDING_DELETE, []).length;
+    updateStatusPill(stillPending > 0 ? 'error' : 'online');
+  }
+
+  processAdd(0);
+}
+
+// ---------------------- Rendering ----------------------
+function renderAll() {
+  renderList();
+  updatePendingBadge();
+  if (state.activeTab === 'report') renderReport();
+  populateReportMonths();
+}
+
+function renderList() {
+  const list = document.getElementById('txList');
+  const empty = document.getElementById('emptyState');
+  if (state.transactions.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = state.transactions.map(tx => {
+    const isIncome = tx.type === 'Income';
+    const sign = isIncome ? '+' : '−';
+    const colorClass = isIncome ? 'text-emerald-400' : 'text-rose-400';
+    const pendingTag = tx._pending
+      ? `<span class="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full">Pending Sync</span>`
+      : '';
+    return `
+      <div class="fade-in flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3">
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-medium text-sm truncate">${escapeHtml(tx.category)}</span>
+            ${pendingTag}
+          </div>
+          <div class="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+            <span>${escapeHtml(String(tx.date))}</span>
+            ${tx.description ? '<span class="truncate">· ' + escapeHtml(tx.description) + '</span>' : ''}
+          </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <span class="font-bold text-sm ${colorClass}">${sign}${formatAmount(tx.amount)}</span>
+          <button onclick="requestDelete('${tx.id}')" class="text-slate-600 hover:text-rose-400 transition p-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>
+            </svg>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function updatePendingBadge() {
+  const pendingCount = loadLS(LS_PENDING_ADD, []).length + loadLS(LS_PENDING_DELETE, []).length;
+  const badge = document.getElementById('pendingBadge');
+  if (pendingCount > 0) {
+    badge.textContent = `${pendingCount} item(s) pending sync`;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function monthLabel(mm) {
+  const names = ['Farvardin','Ordibehesht','Khordad','Tir','Mordad','Shahrivar','Mehr','Aban','Azar','Dey','Bahman','Esfand'];
+  const idx = Number(mm) - 1;
+  return names[idx] || mm;
+}
+
+function populateReportMonths() {
+  const sel = document.getElementById('reportMonthSelect');
+  const monthsPresent = Array.from(new Set(state.transactions.map(t => String(t.date).slice(5, 7)).filter(Boolean)));
+  monthsPresent.sort();
+  const today = new Date();
+  const j = gregorianToJalali(today.getFullYear(), today.getMonth() + 1, today.getDate());
+  const currentMonth = pad2(j.jm);
+  if (!monthsPresent.includes(currentMonth)) monthsPresent.push(currentMonth);
+  monthsPresent.sort();
+
+  const prevValue = sel.value;
+  sel.innerHTML = monthsPresent.map(m => `<option value="${m}">${monthLabel(m)} (Month ${m})</option>`).join('');
+  sel.value = monthsPresent.includes(prevValue) ? prevValue : currentMonth;
+  sel.onchange = renderReport;
+}
+
+function renderReport() {
+  const sel = document.getElementById('reportMonthSelect');
+  if (!sel.value) populateReportMonths();
+  const month = sel.value;
+
+  const monthTx = state.transactions.filter(t => String(t.date).slice(5, 7) === month);
+  const income = monthTx.filter(t => t.type === 'Income').reduce((s, t) => s + Number(t.amount), 0);
+  const expense = monthTx.filter(t => t.type === 'Expense').reduce((s, t) => s + Number(t.amount), 0);
+  const net = income - expense;
+
+  document.getElementById('reportIncome').textContent = formatAmount(income);
+  document.getElementById('reportExpense').textContent = formatAmount(expense);
+  const netEl = document.getElementById('reportNet');
+  netEl.textContent = formatAmount(net);
+  netEl.className = 'text-sm font-bold ' + (net >= 0 ? 'text-emerald-400' : 'text-rose-400');
+
+  const byCategory = {};
+  monthTx.filter(t => t.type === 'Expense').forEach(t => {
+    byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
+  });
+  const labels = Object.keys(byCategory);
+  const values = Object.values(byCategory);
+
+  const canvas = document.getElementById('pieChart');
+  const emptyEl = document.getElementById('chartEmpty');
+
+  if (labels.length === 0) {
+    canvas.classList.add('hidden');
+    emptyEl.classList.remove('hidden');
+    if (state.chart) { state.chart.destroy(); state.chart = null; }
+    return;
+  }
+  canvas.classList.remove('hidden');
+  emptyEl.classList.add('hidden');
+
+  const palette = ['#34d399','#f87171','#fbbf24','#60a5fa','#a78bfa','#f472b6','#2dd4bf','#fb923c','#818cf8'];
+
+  if (state.chart) state.chart.destroy();
+  state.chart = new Chart(canvas.getContext('2d'), {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: labels.map((_, i) => palette[i % palette.length]),
+        borderColor: '#0f172a',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: '#cbd5e1', font: { family: 'Inter' }, padding: 14 }
+        },
+        tooltip: {
+          callbacks: {
+            label: function (ctx) {
+              return ' ' + ctx.label + ': ' + formatAmount(ctx.parsed);
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ---------------------- Status pill & toasts ----------------------
+function updateStatusPill(mode) {
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  const map = {
+    'offline-cache': { color: 'bg-slate-500', label: 'Local Cache' },
+    'syncing': { color: 'bg-amber-400 animate-pulse', label: 'Syncing...' },
+    'online': { color: 'bg-emerald-400', label: 'Synced' },
+    'offline': { color: 'bg-slate-500', label: 'Offline' },
+    'error': { color: 'bg-rose-400', label: 'Sync Error' }
+  };
+  const m = map[mode] || map['offline'];
+  dot.className = 'w-1.5 h-1.5 rounded-full ' + m.color;
+  text.textContent = m.label;
+}
+
+function showToast(message, type) {
+  const container = document.getElementById('toastContainer');
+  const colors = {
+    success: 'bg-emerald-500/90 text-slate-950',
+    error: 'bg-rose-500/90 text-white',
+    info: 'bg-slate-700/90 text-white'
+  };
+  const el = document.createElement('div');
+  el.className = `fade-in pointer-events-auto max-w-xs w-full text-center text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg ${colors[type] || colors.info}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .3s';
+    setTimeout(() => el.remove(), 300);
+  }, 2400);
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+</script>
+</body>
+</html>
