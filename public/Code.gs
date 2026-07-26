@@ -8,14 +8,9 @@ const SHEET_CATEGORIES = 'Categories';
 const SHEET_TRANSACTIONS = 'Transactions';
 const SHEET_REPORT = 'Monthly Report';
 
-const DEFAULT_INCOME_CATEGORIES = [
-  'Salary', 'Freelance', 'Investment', 'Gift', 'Other Income'
-];
+const DEFAULT_INCOME_CATEGORIES = ['Salary','Freelance','Gifts','Family Payment','Taken from Saving'];
 
-const DEFAULT_EXPENSE_CATEGORIES = [
-  'Food', 'Transport', 'Housing', 'Bills', 'Entertainment',
-  'Health', 'Education', 'Shopping', 'Other Expenses'
-];
+const DEFAULT_EXPENSE_CATEGORIES = ['Foods & Drinks', 'Car', 'Internet & Sim', 'Entertainment', 'Healthcare', 'Clothing','House Maintenance','Personal','Loan'];
 
 // ====================================================================
 // SETUP
