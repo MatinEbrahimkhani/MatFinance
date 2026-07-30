@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -40,14 +39,27 @@
     <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">M</div>
     <h1 class="text-lg font-bold">MatFinance</h1>
   </div>
-  <div id="statusPill" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 flex items-center gap-1.5">
+  <button type="button" id="statusPill" onclick="forceSync()" class="cursor-pointer text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 flex items-center gap-1.5 transition-transform active:scale-95 hover:bg-slate-700">
     <span id="statusDot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
     <span id="statusText">Checking...</span>
-  </div>
+  </button>
 </header>
 
-<!-- Toast / error banner -->
 <div id="toastContainer" class="fixed top-16 inset-x-0 z-50 flex flex-col items-center gap-2 px-4 pointer-events-none"></div>
+
+<div id="deleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden px-4">
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-xs w-full space-y-4 text-center fade-in">
+    <div class="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto text-xl font-bold">!</div>
+    <div>
+      <h3 class="font-bold text-slate-100 text-base">Delete Transaction?</h3>
+      <p class="text-xs text-slate-400 mt-1">This action cannot be undone.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-2 pt-2">
+      <button onclick="closeDeleteModal()" class="py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition">Cancel</button>
+      <button id="confirmDeleteBtn" class="py-2.5 rounded-xl bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition">Delete</button>
+    </div>
+  </div>
+</div>
 
 <main class="max-w-md mx-auto px-4 pt-4">
 
@@ -72,8 +84,8 @@
       </div>
 
       <div>
-        <label class="block text-xs text-slate-400 mb-1.5">Description (Optional)</label>
-        <input id="descInput" placeholder="e.g., Groceries"
+        <label class="block text-xs text-slate-400 mb-1.5">Description (Important)</label>
+        <input id="descInput" placeholder="e.g., Grocery shopping at Hyperstar"
           class="w-full bg-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
       </div>
 
@@ -98,7 +110,7 @@
       <h2 class="font-bold text-slate-200">Transaction History</h2>
       <span id="pendingBadge" class="hidden text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400"></span>
     </div>
-    <div id="txList" class="space-y-2"></div>
+    <div id="txList" class="space-y-2.5"></div>
     <div id="emptyState" class="hidden text-center text-slate-500 text-sm py-16">
       No transactions recorded yet.
     </div>
@@ -150,7 +162,6 @@
 </nav>
 
 <script>
-// ---------------------- Constants ----------------------
 const LS_TX = 'matfinance_transactions';
 const LS_PENDING_ADD = 'matfinance_pending_add';
 const LS_PENDING_DELETE = 'matfinance_pending_delete';
@@ -168,10 +179,10 @@ let state = {
   currentType: 'Expense',
   activeTab: 'add',
   chart: null,
-  syncing: false
+  syncing: false,
+  pendingDeleteId: null
 };
 
-// ---------------------- Utilities ----------------------
 function formatAmount(n) {
   const num = Math.round(Number(n) || 0);
   return num.toLocaleString('en-US');
@@ -181,7 +192,6 @@ function parseAmountInput(str) {
   return Number(String(str).replace(/[^0-9]/g, '')) || 0;
 }
 
-// Format input live as user types
 document.getElementById('amountInput').addEventListener('input', function() {
   let raw = this.value.replace(/[^0-9]/g, '');
   if (raw === '') {
@@ -202,7 +212,31 @@ function loadLS(key, fallback) {
   } catch (e) { return fallback; }
 }
 
-// ---------------------- Jalali <-> Gregorian ----------------------
+function jalaliToGregorian(jy, jm, jd) {
+  jy = Number(jy); jm = Number(jm); jd = Number(jd);
+  var gy = (jy <= 979) ? 621 : 1600;
+  jy -= (jy <= 979) ? 0 : 979;
+  var days = (365 * jy) + parseInt(jy / 33) * 8 + parseInt(((jy % 33) + 3) / 4) + 78 + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+  gy += 400 * parseInt(days / 146097);
+  days %= 146097;
+  if (days > 36524) {
+    gy += 100 * parseInt(--days / 36524);
+    days %= 36524;
+    if (days >= 365) days++;
+  }
+  gy += 4 * parseInt(days / 1461);
+  days %= 1461;
+  if (days > 365) {
+    gy += parseInt((days - 1) / 365);
+    days = (days - 1) % 365;
+  }
+  var gd = days + 1;
+  var sal_a = [0, 31, ((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  var gm;
+  for (gm = 0; gm < 13 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+  return { gy: gy, gm: gm, gd: gd };
+}
+
 function gregorianToJalali(gy, gm, gd) {
   const g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
   let jy = (gy <= 1600) ? 0 : 979;
@@ -222,6 +256,7 @@ function gregorianToJalali(gy, gm, gd) {
   const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
   return { jy: jy, jm: jm, jd: jd };
 }
+
 function jalaliDaysInMonth(jy, jm) {
   if (jm <= 6) return 31;
   if (jm <= 11) return 30;
@@ -230,7 +265,48 @@ function jalaliDaysInMonth(jy, jm) {
 }
 function pad2(n) { return String(n).padStart(2, '0'); }
 
-// ---------------------- Init ----------------------
+function formatDisplayDate(dateVal) {
+  if (!dateVal) return '';
+  var str = String(dateVal).trim();
+  
+  // 1. Check for Jalali format like "1403/02/15" or "1403/02/15 14:30"
+  var jMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+  if (jMatch) {
+    var jy = Number(jMatch[1]);
+    var jm = Number(jMatch[2]);
+    var jd = Number(jMatch[3]);
+    var hh = jMatch[4] !== undefined ? pad2(jMatch[4]) : null;
+    var mm = jMatch[5] !== undefined ? pad2(jMatch[5]) : null;
+
+    var g = jalaliToGregorian(jy, jm, jd);
+    var d = new Date(g.gy, g.gm - 1, g.gd);
+    var dayName = !isNaN(d.getTime()) ? d.toLocaleDateString('en-US', { weekday: 'short' }) : '';
+    
+    var datePart = `${jy}/${pad2(jm)}/${pad2(jd)}`;
+    var timePart = (hh && mm) ? `${hh}:${mm}` : '';
+    
+    return [dayName, datePart, timePart].filter(Boolean).join(' · ');
+  }
+
+  // 2. Check for standard JS Date object string (e.g. "Sat May 04 1405 00:00:00 GMT...")
+  var d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    var dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    var month = d.toLocaleDateString('en-US', { month: 'short' });
+    var day = pad2(d.getDate());
+    var year = d.getFullYear();
+    var hh = pad2(d.getHours());
+    var mm = pad2(d.getMinutes());
+    
+    var timePart = (hh !== '00' || mm !== '00') ? `${hh}:${mm}` : '';
+    var datePart = `${month} ${day}, ${year}`;
+    
+    return [dayName, datePart, timePart].filter(Boolean).join(' · ');
+  }
+
+  return str;
+}
+
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
@@ -250,12 +326,21 @@ function init() {
 
   window.addEventListener('online', flushPendingQueue);
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') flushPendingQueue();
+    if (document.visibilityState === 'visible') {
+      refreshFromServer();
+      flushPendingQueue();
+    }
   });
   setInterval(flushPendingQueue, 30000);
 }
 
-// ---------------------- Tabs ----------------------
+function forceSync() {
+  if (state.syncing) return;
+  showToast('Fetching latest data...', 'info');
+  refreshFromServer();
+  flushPendingQueue();
+}
+
 function switchTab(tab) {
   state.activeTab = tab;
   ['add', 'list', 'report'].forEach(t => {
@@ -266,7 +351,6 @@ function switchTab(tab) {
   if (tab === 'report') renderReport();
 }
 
-// ---------------------- Add form ----------------------
 function setTxType(type) {
   state.currentType = type;
   const expBtn = document.getElementById('btnTypeExpense');
@@ -283,8 +367,14 @@ function setTxType(type) {
 
 function buildCategoryOptions() {
   const sel = document.getElementById('categorySelect');
-  const list = state.currentType === 'Income' ? state.categories.income : state.categories.expense;
+  const currentSelected = sel.value;
+  const list = state.currentType === 'Income' ? (state.categories.income || []) : (state.categories.expense || []);
+  
   sel.innerHTML = list.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  
+  if (currentSelected && list.includes(currentSelected)) {
+    sel.value = currentSelected;
+  }
 }
 
 function buildDatePickers() {
@@ -328,7 +418,11 @@ function onSubmitTransaction(e) {
   const amount = parseAmountInput(document.getElementById('amountInput').value);
   const category = document.getElementById('categorySelect').value;
   const description = document.getElementById('descInput').value.trim();
-  const date = getSelectedJalaliDateString();
+  
+  const now = new Date();
+  const hh = pad2(now.getHours());
+  const mm = pad2(now.getMinutes());
+  const dateWithTime = `${getSelectedJalaliDateString()} ${hh}:${mm}`;
 
   if (!amount || amount <= 0) {
     showToast('Please enter a valid amount.', 'error');
@@ -341,7 +435,7 @@ function onSubmitTransaction(e) {
 
   const tx = {
     id: uid(),
-    date: date,
+    date: dateWithTime,
     type: state.currentType,
     category: category,
     description: description,
@@ -365,10 +459,25 @@ function onSubmitTransaction(e) {
   flushPendingQueue();
 }
 
-// ---------------------- Delete ----------------------
 function requestDelete(id) {
-  if (!confirm('Delete this transaction?')) return;
+  state.pendingDeleteId = id;
+  const modal = document.getElementById('deleteModal');
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  modal.classList.remove('hidden');
+  
+  confirmBtn.onclick = function() {
+    executeDelete(state.pendingDeleteId);
+    closeDeleteModal();
+  };
+}
 
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.add('hidden');
+  state.pendingDeleteId = null;
+}
+
+function executeDelete(id) {
+  if (!id) return;
   state.transactions = state.transactions.filter(t => t.id !== id);
   saveLS(LS_TX, state.transactions);
   renderAll();
@@ -389,7 +498,6 @@ function requestDelete(id) {
   flushPendingQueue();
 }
 
-// ---------------------- Sync engine ----------------------
 function isGasAvailable() {
   return typeof google !== 'undefined' && google.script && google.script.run;
 }
@@ -397,29 +505,39 @@ function isGasAvailable() {
 function refreshFromServer() {
   if (!isGasAvailable()) { updateStatusPill('offline'); return; }
   updateStatusPill('syncing');
+  
   google.script.run
     .withSuccessHandler(function (res) {
       if (res && res.success) {
-        state.categories = res.data.categories;
-        saveLS(LS_CATEGORIES, state.categories);
-        buildCategoryOptions();
+        if (res.data.categories) {
+          const oldCats = JSON.stringify(state.categories);
+          state.categories = res.data.categories;
+          saveLS(LS_CATEGORIES, state.categories);
+          buildCategoryOptions();
+          
+          if (oldCats !== JSON.stringify(state.categories)) {
+             showToast('Categories updated!', 'success');
+          }
+        }
 
         const pendingIds = new Set(loadLS(LS_PENDING_ADD, []).map(t => t.id));
         const serverTx = res.data.transactions.map(t => Object.assign({}, t, { _pending: false }));
         const stillPendingLocal = state.transactions.filter(t => pendingIds.has(t.id));
         state.transactions = stillPendingLocal.concat(serverTx)
           .sort((a, b) => (a.date < b.date ? 1 : -1));
+        
         saveLS(LS_TX, state.transactions);
         saveLS(LS_LAST_SYNC, Date.now());
         renderAll();
         updateStatusPill('online');
       } else {
-        updateStatusPill('error', res ? res.error : 'Unknown Error');
+        updateStatusPill('error');
+        showToast('Data Error: ' + (res.error || 'Unknown problem'), 'error');
       }
     })
     .withFailureHandler(function (err) {
-      updateStatusPill('offline');
-      console.warn('refreshFromServer failed:', err);
+      updateStatusPill('error');
+      showToast('Network Error: ' + err.message, 'error');
     })
     .getInitialData();
 }
@@ -455,15 +573,10 @@ function flushPendingQueue() {
           remaining = remaining.filter(t => t.id !== tx.id);
           saveLS(LS_PENDING_ADD, remaining);
           renderAll();
-        } else {
-          console.warn('addTransaction sync failed, will retry:', res && res.error);
         }
         processAdd(i + 1);
       })
-      .withFailureHandler(function (err) {
-        console.warn('addTransaction network failure, will retry:', err);
-        processAdd(addQueue.length);
-      })
+      .withFailureHandler(function () { processAdd(addQueue.length); })
       .addTransaction(tx);
   }
 
@@ -471,16 +584,13 @@ function flushPendingQueue() {
     if (i >= delQueue.length) { finishSync(); return; }
     const id = delQueue[i];
     google.script.run
-      .withSuccessHandler(function (res) {
+      .withSuccessHandler(function () {
         let remaining = loadLS(LS_PENDING_DELETE, []);
         remaining = remaining.filter(x => x !== id);
         saveLS(LS_PENDING_DELETE, remaining);
         processDelete(i + 1);
       })
-      .withFailureHandler(function (err) {
-        console.warn('deleteTransaction network failure, will retry:', err);
-        processDelete(delQueue.length);
-      })
+      .withFailureHandler(function () { processDelete(delQueue.length); })
       .deleteTransaction(id);
   }
 
@@ -494,7 +604,6 @@ function flushPendingQueue() {
   processAdd(0);
 }
 
-// ---------------------- Rendering ----------------------
 function renderAll() {
   renderList();
   updatePendingBadge();
@@ -517,23 +626,34 @@ function renderList() {
     const sign = isIncome ? '+' : '−';
     const colorClass = isIncome ? 'text-emerald-400' : 'text-rose-400';
     const pendingTag = tx._pending
-      ? `<span class="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full">Pending Sync</span>`
+      ? `<span class="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full border border-amber-500/20">Pending</span>`
       : '';
+      
+    const mainTitle = tx.description ? tx.description : tx.category;
+    const formattedDate = formatDisplayDate(tx.date);
+
     return `
-      <div class="fade-in flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-3">
-        <div class="min-w-0">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="font-medium text-sm truncate">${escapeHtml(tx.category)}</span>
+      <div class="fade-in flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-3.5 gap-3">
+        <div class="min-w-0 flex-1">
+          <!-- Prominent Description / Title -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-bold text-base text-slate-100 truncate">${escapeHtml(mainTitle)}</span>
             ${pendingTag}
           </div>
-          <div class="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-            <span>${escapeHtml(String(tx.date))}</span>
-            ${tx.description ? '<span class="truncate">· ' + escapeHtml(tx.description) + '</span>' : ''}
+          
+          <!-- Category & Clean Date/Time Subtitle -->
+          <div class="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+            ${tx.description ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-400 font-semibold border border-slate-700/50">${escapeHtml(tx.category)}</span>` : ''}
+            <span class="text-slate-400 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              ${escapeHtml(formattedDate)}
+            </span>
           </div>
         </div>
+
         <div class="flex items-center gap-3 shrink-0">
-          <span class="font-bold text-sm ${colorClass}">${sign}${formatAmount(tx.amount)}</span>
-          <button onclick="requestDelete('${tx.id}')" class="text-slate-600 hover:text-rose-400 transition p-1">
+          <span class="font-bold text-base ${colorClass}">${sign}${formatAmount(tx.amount)}</span>
+          <button onclick="requestDelete('${tx.id}')" class="text-slate-500 hover:text-rose-400 transition p-1.5 rounded-lg hover:bg-slate-800">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>
             </svg>
@@ -644,7 +764,6 @@ function renderReport() {
   });
 }
 
-// ---------------------- Status pill & toasts ----------------------
 function updateStatusPill(mode) {
   const dot = document.getElementById('statusDot');
   const text = document.getElementById('statusText');
